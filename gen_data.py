@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import itertools
 import random
-import numpy as np
+# import numpy as np
 
 from math import prod
 from random import randrange
@@ -186,7 +186,7 @@ def gen_data(json_data, list_output=False):
     for table in tables:
         for col in data[table].columns:
             if 'int' not in tables_col_info[table][col]:
-                data[table][col]=data[table][col].astype(str).replace("<NA>", np.nan)
+                data[table][col]=data[table][col].astype(str).replace("<NA>", pd.NA)
 
         no_data_col = {
             name: dtype
