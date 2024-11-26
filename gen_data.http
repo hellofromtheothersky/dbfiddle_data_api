@@ -2,6 +2,8 @@ POST http://localhost:8000/gen_data HTTP/1.1
 content-type: application/json
 
 {
+"dbml_json":
+{
   "database": {
     "1": {
       "id": 1,
@@ -1123,4 +1125,6 @@ content-type: application/json
       "enumId": null
     }
   }
+},
+  "custom_prompt": "product name in product table is about dress or pant; companyname in supplier is vietnamese companies"
 }

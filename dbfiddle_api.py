@@ -9,7 +9,12 @@ app = FastAPI()
 
 @app.post("/gen_data")
 async def generate_data(json_data: dict) -> dict:
-    result = gen_data(json_data, list_output=True)
+    result = gen_data(
+        json_data["dbml_json"],
+        list_output=True,
+        ai_data=True,
+        custom_prompt=json_data["custom_prompt"],
+    )
     return jsonable_encoder(result)
 
 

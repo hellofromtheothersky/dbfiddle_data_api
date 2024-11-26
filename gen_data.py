@@ -107,7 +107,7 @@ def gen_pk_fk(erd, tables_col_info, ref_cols):
                         )
 
                 # define pk
-                data[node][node] = [i for i in range(node_rows)]
+                data[node][node] = [i+1 for i in range(node_rows)]
 
                 print(f"{node_rows} row(s)")
 
@@ -149,7 +149,7 @@ def extract_json_to_dict(text):
         return None
 
 
-def create_ai_data(table_name, column_types, num_rows):
+def create_ai_data(table_name, column_types, num_rows, custom_prompt):
     print("AI processing for: ", table_name)
     question = (
         """
@@ -158,6 +158,11 @@ def create_ai_data(table_name, column_types, num_rows):
         + """ sample value for each column in each table suitable with its data type, 
         the input is a dict in this format {"table1": {"col1": datatype}}, the output is a json format, 
         for example, {"table1": {"col1": [list of sample value]}}:
+
+        Another requirements, it will tell you how to define data for some specific columns in specific tables clearly (ignore if it is blank)
+        """
+        +custom_prompt+
+        """
 
         Input:
 
@@ -224,7 +229,7 @@ def create_sample_data(column_types, num_rows):
     return pd.DataFrame(data_samples)
 
 
-def gen_data(json_data, list_output=False, ai_data=True):
+def gen_data(json_data, list_output=False, ai_data=True, custom_prompt=""):
     tables_col_info = extract_tables(json_data)
     print({k: {k1: v1 for k1, v1 in v.items() if k1!='?'} for k, v in tables_col_info.items()})
     tables = list(tables_col_info.keys())
@@ -252,16 +257,16 @@ def gen_data(json_data, list_output=False, ai_data=True):
         }
 
         if ai_data:
-            data_for_no_data_col = create_ai_data(table, no_data_col, len(data[table]))
+            data_for_no_data_col = create_ai_data(
+                table, no_data_col, len(data[table]), custom_prompt
+            )
         else:
             data_for_no_data_col = create_sample_data(no_data_col, len(data[table]))
-
 
         data[table] = data[table].join(data_for_no_data_col)
         data[table] = data[table][[x for x in tables_col_info[table].keys() if x!='?']]
         if list_output:
-            data[table] = data[table].values.tolist()
-
+            data[table] = [val for key, val in pd.DataFrame(data[table].T).to_dict().items()]
     return data
 
 
