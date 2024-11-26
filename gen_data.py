@@ -1,15 +1,14 @@
 import networkx as nx
 import re
 import pandas as pd
-import itertools
 import random
 import numpy as np
 
 from math import prod
 from random import randrange
-import json
 import math
 from dbml_json_handling import *
+import requests
 
 
 class RanProduct:
@@ -132,6 +131,63 @@ def sanitize_value(value):
     return re.sub(r"[^a-zA-Z0-9_]+", "", value)
 
 
+def extract_json_to_dict(text):
+    # Use a regular expression to find the JSON part inside the triple backticks
+    json_pattern = r"```json\n(.*?)\n```"
+    match = re.search(json_pattern, text, re.DOTALL)
+
+    if match:
+        json_text = match.group(1)  # Extract the matched JSON text
+        try:
+            # Convert the JSON text to a Python dictionary
+            return json.loads(json_text)
+        except json.JSONDecodeError as e:
+            print("Failed to decode JSON:", e)
+            return None
+    else:
+        print("No JSON found in the text.")
+        return None
+
+
+def create_ai_data(table_name, column_types, num_rows):
+    print("AI processing for: ", table_name)
+    question = (
+        """
+        Generate """
+        + str(num_rows)
+        + """ sample value for each column in each table suitable with its data type, 
+        the input is a dict in this format {"table1": {"col1": datatype}}, the output is a json format, 
+        for example, {"table1": {"col1": [list of sample value]}}:
+
+        Input:
+
+        """
+        + str({table_name: column_types})
+    )
+
+    # Define the API endpoint and payload
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyAHVdtv1XA47pkIGwF6hoXt2w-aV_EiuEo"
+    headers = {"Content-Type": "application/json"}
+    data = {"contents": [{"parts": [{"text": question}]}]}
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, json=data)
+
+    # Check the response
+    if response.status_code == 200:
+        data = extract_json_to_dict(
+            response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        )
+        df=pd.DataFrame()
+        for col, col_data in data[table_name].items():
+            df[col]=col_data
+        return df
+    else:
+        raise Exception(
+            f"Request failed with status code: {response.status_code}: {response.text}"
+        )
+
+
 def create_sample_data(column_types, num_rows):
     data_samples = []
 
@@ -168,8 +224,9 @@ def create_sample_data(column_types, num_rows):
     return pd.DataFrame(data_samples)
 
 
-def gen_data(json_data, list_output=False):
+def gen_data(json_data, list_output=False, ai_data=True):
     tables_col_info = extract_tables(json_data)
+    print({k: {k1: v1 for k1, v1 in v.items() if k1!='?'} for k, v in tables_col_info.items()})
     tables = list(tables_col_info.keys())
 
     many_one_relationships, ref_cols = extract_ref(json_data)
@@ -194,7 +251,11 @@ def gen_data(json_data, list_output=False):
             if name != "?" and name not in data[table].columns
         }
 
-        data_for_no_data_col = create_sample_data(no_data_col, len(data[table]))
+        if ai_data:
+            data_for_no_data_col = create_ai_data(table, no_data_col, len(data[table]))
+        else:
+            data_for_no_data_col = create_sample_data(no_data_col, len(data[table]))
+
 
         data[table] = data[table].join(data_for_no_data_col)
         data[table] = data[table][[x for x in tables_col_info[table].keys() if x!='?']]

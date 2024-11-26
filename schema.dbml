@@ -1,0 +1,21 @@
+Table "Product"{
+  "Id" int
+  "ProductName" varchar(100)
+  "SupplierId" int
+}
+Table "Supplier"{
+  "Id" int
+  "CompanyName" varchar(100)
+}
+Table "OrderItem"{
+  "Id" int
+  "ProductId" int
+  "OrderId" int
+}
+Table "Order"{
+  "Id" int
+  "OrderNumber" varchar(100)
+}
+Ref: "OrderItem"."ProductId" > "Product"."Id"
+Ref: "OrderItem"."OrderId" > "Order"."Id"
+Ref: "Product"."SupplierId" > "Supplier"."Id"
