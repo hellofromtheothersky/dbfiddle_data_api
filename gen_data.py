@@ -68,48 +68,45 @@ def gen_pk_fk(erd, tables_col_info, ref_cols):
             else:
                 print(f"== Gen: {node}")
                 print(f"Dependency tables: {parent_nodes}")
+
                 data[node] = pd.DataFrame()
 
                 # define fk
-                node_rows = min_num_rows
+                node_num_rows = min_num_rows
                 if parent_nodes:
-                    parent_rows = []
-                    fk_all_tb = []
+                    num_rows_per_parent = []
+                    all_parent_keys_set = []
                     for p in parent_nodes:
                         parent_keys = list(data[p][p])
                         random.shuffle(parent_keys)
-                        parent_keys = parent_keys[
-                            : int(len(parent_keys) * matching_rate)
-                        ]
-                        fk_all_tb.append(parent_keys)
-                        parent_rows.append(len(parent_keys))
+                        parent_keys = parent_keys[: int(len(parent_keys) * matching_rate)]
+                        all_parent_keys_set.append(parent_keys)
+                        num_rows_per_parent.append(len(parent_keys))
 
-                    combination_rows = max(
-                        max(parent_rows), int(math.prod(parent_rows) * combination_rate)
+                    selected_num_combination_rows = max(
+                        max(num_rows_per_parent), int(math.prod(num_rows_per_parent) * combination_rate)
                     )
+                    node_num_rows = selected_num_combination_rows
 
-                    ranproduct = RanProduct(fk_all_tb)
+                    ranproduct = RanProduct(all_parent_keys_set)
 
-                    all_fk_combination = list(ranproduct.picklistran(combination_rows))
-                    random.shuffle(all_fk_combination)
+                    selected_fk_combination = list(ranproduct.picklistran(selected_num_combination_rows))
+                    random.shuffle(selected_fk_combination)
 
-                    node_rows = max(node_rows, len(all_fk_combination))
                     for i, parent_table in enumerate(parent_nodes):
-                        fk_col_val = [int(fk[i]) for fk in all_fk_combination][
-                            :node_rows
+                        fk_col_val = [fk[i] for fk in selected_fk_combination][
+                            :node_num_rows
                         ]
                         fk_col_val.extend(
-                            [None for i in range(len(all_fk_combination), min_num_rows)]
+                            [None for i in range(len(selected_fk_combination), min_num_rows)]
                         )
                         data[node][parent_table] = fk_col_val
-                        data[node][parent_table] = data[node][parent_table].astype(
-                            pd.Int64Dtype()
-                        )
+                        data[node][parent_table] = data[node][parent_table].astype(pd.Int64Dtype())
 
                 # define pk
-                data[node][node] = [i+1 for i in range(node_rows)]
+                data[node][node] = [i+1 for i in range(node_num_rows)]
 
-                print(f"{node_rows} row(s)")
+                print(f"{node_num_rows} row(s)")
 
                 stack.pop()
 
@@ -266,7 +263,7 @@ def gen_data(json_data, list_output=False, ai_data=True, custom_prompt=""):
         data[table] = data[table].join(data_for_no_data_col)
         data[table] = data[table][[x for x in tables_col_info[table].keys() if x!='?']]
         if list_output:
-            data[table] = [val for key, val in pd.DataFrame(data[table].T).to_dict().items()]
+            data[table] = [val for key, val in data[table].T.to_dict().items()]
     return data
 
 
