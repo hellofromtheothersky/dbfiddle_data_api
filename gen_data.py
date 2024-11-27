@@ -9,6 +9,15 @@ from random import randrange
 import math
 from dbml_json_handling import *
 import requests
+import itertools
+
+min_num_rows = 5
+max_num_rows = 99
+# num of PK in parent table have its FK in child table / num of all PK
+matching_rate = 0.8
+# for per FK on child table, how many occurences of it
+permutation_rate = 0.12
+max_num_rows_permutation=32
 
 
 class RanProduct:
@@ -38,12 +47,6 @@ class RanProduct:
 
 def gen_pk_fk(erd, tables_col_info, ref_cols):
     start_nodes = [node for node in erd.nodes if erd.in_degree(node) == 0]
-
-    min_num_rows = 10
-    # num of PK in parent table have its FK in child table / num of all PK
-    matching_rate = 0.8
-    # for per FK on child table, how many occurences of it
-    combination_rate = 0.12
 
     data = dict()
 
@@ -79,32 +82,56 @@ def gen_pk_fk(erd, tables_col_info, ref_cols):
                     for p in parent_nodes:
                         parent_keys = list(data[p][p])
                         random.shuffle(parent_keys)
-                        parent_keys = parent_keys[: int(len(parent_keys) * matching_rate)]
+                        parent_keys = parent_keys[
+                            : int(len(parent_keys) * matching_rate)
+                        ]
                         all_parent_keys_set.append(parent_keys)
                         num_rows_per_parent.append(len(parent_keys))
 
-                    selected_num_combination_rows = max(
-                        max(num_rows_per_parent), int(math.prod(num_rows_per_parent) * combination_rate)
+                    null_permutations = [
+                        "".join(seq)
+                        for seq in itertools.product("01", repeat=len(parent_nodes))
+                    ][
+                        1:max_num_rows_permutation
+                    ]  # ignore the first one, which is all non null value
+                    selected_num_permutation_rows = min(
+                        max(
+                            max(num_rows_per_parent),
+                            int(math.prod(num_rows_per_parent) * permutation_rate),
+                        ),
+                        max_num_rows - len(null_permutations)
                     )
-                    node_num_rows = selected_num_combination_rows
+
+                    node_num_rows = selected_num_permutation_rows + len(
+                        null_permutations
+                    )
 
                     ranproduct = RanProduct(all_parent_keys_set)
 
-                    selected_fk_combination = list(ranproduct.picklistran(selected_num_combination_rows))
-                    random.shuffle(selected_fk_combination)
+                    selected_fk_permutation = list(
+                        ranproduct.picklistran(selected_num_permutation_rows)
+                    )
+                    random.shuffle(selected_fk_permutation)
 
-                    for i, parent_table in enumerate(parent_nodes):
-                        fk_col_val = [fk[i] for fk in selected_fk_combination][
-                            :node_num_rows
+                    for parent_table_i, parent_table in enumerate(parent_nodes):
+                        fk_col_val = [
+                            fk[parent_table_i] for fk in selected_fk_permutation
                         ]
-                        fk_col_val.extend(
-                            [None for i in range(len(selected_fk_combination), min_num_rows)]
-                        )
+                        for null_permutation in null_permutations:
+                            if null_permutation[parent_table_i] == "1":
+                                fk_col_val.append(None)
+                            else:
+                                fk_col_val.append(
+                                    random.choice(all_parent_keys_set[parent_table_i])
+                                )
+
                         data[node][parent_table] = fk_col_val
-                        data[node][parent_table] = data[node][parent_table].astype(pd.Int64Dtype())
+                        data[node][parent_table] = data[node][parent_table].astype(
+                            pd.Int64Dtype()
+                        )
 
                 # define pk
-                data[node][node] = [i+1 for i in range(node_num_rows)]
+                data[node][node] = [i + 1 for i in range(node_num_rows)]
 
                 print(f"{node_num_rows} row(s)")
 
@@ -158,8 +185,8 @@ def create_ai_data(table_name, column_types, num_rows, custom_prompt):
 
         Another requirements, it will tell you how to define data for some specific columns in specific tables clearly (ignore if it is blank)
         """
-        +custom_prompt+
-        """
+        + custom_prompt
+        + """
 
         Input:
 
@@ -180,9 +207,9 @@ def create_ai_data(table_name, column_types, num_rows, custom_prompt):
         data = extract_json_to_dict(
             response.json()["candidates"][0]["content"]["parts"][0]["text"]
         )
-        df=pd.DataFrame()
+        df = pd.DataFrame()
         for col, col_data in data[table_name].items():
-            df[col]=col_data
+            df[col] = col_data
         return df
     else:
         raise Exception(
@@ -196,9 +223,10 @@ def create_sample_data(column_types, num_rows):
     for _ in range(num_rows):
         row = {}
         for column_name, data_type in column_types.items():
-            if "int" in data_type:
+            data_type = data_type.lower()
+            if "int" in data_type or "uniqueidentifier" in data_type:
                 row[column_name] = random.randint(
-                    1, 100
+                    1, 1000
                 )  # Random int between 1 and 100
             elif "varchar" in data_type:
                 sanitized_name = sanitize_value(column_name)
@@ -228,7 +256,12 @@ def create_sample_data(column_types, num_rows):
 
 def gen_data(json_data, list_output=False, ai_data=True, custom_prompt=""):
     tables_col_info = extract_tables(json_data)
-    print({k: {k1: v1 for k1, v1 in v.items() if k1!='?'} for k, v in tables_col_info.items()})
+    print(
+        {
+            k: {k1: v1 for k1, v1 in v.items() if k1 != "?"}
+            for k, v in tables_col_info.items()
+        }
+    )
     tables = list(tables_col_info.keys())
 
     many_one_relationships, ref_cols = extract_ref(json_data)
@@ -244,8 +277,8 @@ def gen_data(json_data, list_output=False, ai_data=True, custom_prompt=""):
 
     for table in tables:
         for col in data[table].columns:
-            if 'int' not in tables_col_info[table][col]:
-                data[table][col]=data[table][col].astype(str).replace("<NA>", np.nan)
+            if "int" not in tables_col_info[table][col]:
+                data[table][col] = data[table][col].astype(str).replace("<NA>", np.nan)
 
         no_data_col = {
             name: dtype
@@ -261,7 +294,9 @@ def gen_data(json_data, list_output=False, ai_data=True, custom_prompt=""):
             data_for_no_data_col = create_sample_data(no_data_col, len(data[table]))
 
         data[table] = data[table].join(data_for_no_data_col)
-        data[table] = data[table][[x for x in tables_col_info[table].keys() if x!='?']]
+        data[table] = data[table][
+            [x for x in tables_col_info[table].keys() if x != "?"]
+        ]
         if list_output:
             data[table] = [val for key, val in data[table].T.to_dict().items()]
     return data
