@@ -25,7 +25,7 @@ def infer_schema(json_data):
         elif "object" in v:
             map_dtype = "varchar"
         elif "date" in v:
-            map_dtype = "datetime"
+            map_dtype = "timestamp"
         a[k] = map_dtype
 
     col = "\n  ".join([col + " " + dtype for col, dtype in a.items()])
