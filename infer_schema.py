@@ -29,7 +29,7 @@ def infer_schema(json_data):
         a[k] = map_dtype
 
     col = "\n  ".join([col + " " + dtype for col, dtype in a.items()])
-    return f"Table {json_data['name']}{{\n  {col}\n}}"
+    return f"Table {json_data['name']} {{\n  {col}\n}}"
 
 
 # print(infer_schema(    json_data = {

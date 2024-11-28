@@ -5,6 +5,7 @@ from gen_data import gen_data
 from gen_schema import gen_schema
 from infer_schema import infer_schema
 import json
+from typing import List
 
 app = FastAPI()
 
@@ -30,5 +31,6 @@ async def generate_schema(json_data: dict) -> str:
 
 
 @app.post("/infer_schema")
-async def generate_schema(json_data: dict) -> str:
-    return jsonable_encoder(infer_schema(json_data))
+async def generate_schema(json_data: List[dict]) -> str:
+    results = [jsonable_encoder(infer_schema(item)) for item in json_data]
+    return "\n".join(results)
