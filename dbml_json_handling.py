@@ -1,5 +1,3 @@
-import json
-
 def extract_tables(json_data):
     tables_dict = {}
     tables = [None]

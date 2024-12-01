@@ -1,8 +1,0 @@
-services:
-  dbfiddle-data-service:
-    build: .
-    container_name: dbfiddle-data-service
-    restart: unless-stopped
-    image: dbfiddle-data-service
-    ports:
-      - 8000:8000

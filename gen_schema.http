@@ -1,7 +1,0 @@
-POST http://localhost:8000/gen_schema HTTP/1.1
-content-type: application/json
-
-{
-  "query": "SELECT OrderNumber, CompanyName, ProductName FROM Product P JOIN Supplier S ON S.Id = P.SupplierId JOIN OrderItem I ON P.Id = I.ProductId JOIN [Order] O ON O.Id = I.OrderId ORDER BY OrderNumber"
-}
-
